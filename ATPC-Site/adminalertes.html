@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>APTC - Admin Alertes</title>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
+
+    <style>
+        body { margin:0; background:#0a1a2a; color:white; font-family:Arial; }
+
+        .navbar {
+            display:flex; align-items:center;
+            background:rgba(0,0,0,0.85);
+            padding:10px 20px;
+            border-bottom:2px solid #1e90ff;
+            position:fixed; top:0; width:100%; z-index:1000;
+        }
+        .navbar img { height:45px; margin-right:10px; }
+        .navbar .title { font-size:22px; font-weight:bold; margin-right:40px; }
+        .navbar a { margin-right:20px; color:#cfe8ff; text-decoration:none; font-size:18px; }
+        .navbar a:hover { color:#1e90ff; }
+
+        .content { display:flex; margin-top:80px; height:calc(100vh - 80px); }
+
+        .sidebar {
+            width:260px; background:rgba(0,0,0,0.7);
+            padding:15px; border-right:1px solid rgba(255,255,255,0.1);
+        }
+        .sidebar h2 { margin-top:0; font-size:22px; }
+        .alert-btn {
+            width:100%; margin:6px 0; padding:8px 10px;
+            border:none; border-radius:6px; cursor:pointer;
+            font-size:15px; font-weight:bold; color:white;
+        }
+        .alert-btn.active { outline:2px solid white; }
+
+        .alert-tornado { background:#ff0000; }
+        .alert-severe { background:#ff7f00; }
+        .alert-hail { background:#8a2be2; }
+        .alert-lightning { background:#ffff00; color:black; }
+        .alert-rain { background:#0066ff; }
+        .alert-wind { background:#00ffff; color:black; }
+
+        #map { flex:1; }
+
+        .legende-alertes {
+            position:fixed; bottom:20px; right:20px;
+            background:rgba(0,0,0,0.65);
+            padding:15px 20px; border-radius:12px;
+            border:1px solid rgba(255,255,255,0.15);
+            font-size:14px; z-index:9999;
+        }
+        .legende-alertes .ligne { display:flex; align-items:center; margin-bottom:6px; }
+        .legende-alertes .couleur {
+            width:18px; height:18px; border-radius:4px; margin-right:8px;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="navbar">
+    <img src="logo.png">
+    <div class="title">A.P.T.C</div>
+
+    <a href="adminindex.html">Accueil</a>
+    <a href="adminactualites.html">Actualités</a>
+    <a href="adminalertes.html">Alertes</a>
+    <a href="adminradars.html">Radars</a>
+    <a href="adminrecherches.html">Recherches</a>
+    <a href="adminrisques.html">Risques</a>
+    <a href="adminsaison-tornades.html">Saison Tornades</a>
+    <a href="adminsaison-cyclones-tropicaux.html">Saison Cyclones Tropicaux</a>
+</div>
+
+<div class="content">
+
+    <div class="sidebar">
+        <h2>Types d'alertes</h2>
+        <p>Choisis un type puis dessine une zone.</p>
+
+        <button class="alert-btn alert-tornado" data-alert="Tornado Warning" data-color="#ff0000">Tornado Warning</button>
+        <button class="alert-btn alert-severe" data-alert="Orage sévère" data-color="#ff7f00">Orage sévère</button>
+        <button class="alert-btn alert-hail" data-alert="Grêle" data-color="#8a2be2">Grêle</button>
+        <button class="alert-btn alert-lightning" data-alert="Foudre intense" data-color="#ffff00">Foudre intense</button>
+        <button class="alert-btn alert-rain" data-alert="Pluie extrême" data-color="#0066ff">Pluie extrême</button>
+        <button class="alert-btn alert-wind" data-alert="Vent violent" data-color="#00ffff">Vent violent</button>
+    </div>
+
+    <div id="map"></div>
+</div>
+
+<div class="legende-alertes">
+    <h3>Légende des alertes</h3>
+    <div class="ligne"><span class="couleur" style="background:#ff0000;"></span> Tornado Warning</div>
+    <div class="ligne"><span class="couleur" style="background:#ff7f00;"></span> Orage sévère</div>
+    <div class="ligne"><span class="couleur" style="background:#8a2be2;"></span> Grêle</div>
+    <div class="ligne"><span class="couleur" style="background:#ffff00;"></span> Foudre intense</div>
+    <div class="ligne"><span class="couleur" style="background:#0066ff;"></span> Pluie extrême</div>
+    <div class="ligne"><span class="couleur" style="background:#00ffff;"></span> Vent violent</div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+
+<script>
+
+const map = L.map('map').setView([46.8, 2.5], 6);
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom:12, minZoom:4
+}).addTo(map);
+
+const drawnItems = new L.FeatureGroup();
+map.addLayer(drawnItems);
+
+let currentAlert = null;
+let currentColor = "#ff0000";
+
+document.querySelectorAll('.alert-btn').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+        document.querySelectorAll('.alert-btn').forEach(b=>b.classList.remove('active'));
+        btn.classList.add('active');
+        currentAlert = btn.dataset.alert;
+        currentColor = btn.dataset.color;
+    });
+});
+
+const drawControl = new L.Control.Draw({
+    draw:{
+        polygon:{ shapeOptions:{ color:currentColor, fillColor:currentColor, fillOpacity:0.4 }},
+        rectangle:{ shapeOptions:{ color:currentColor, fillColor:currentColor, fillOpacity:0.4 }},
+        circle:false, marker:false, polyline:false
+    },
+    edit:{ featureGroup:drawnItems }
+});
+map.addControl(drawControl);
+
+function getDateInfo(){
+    const now = new Date();
+    const day = String(now.getDate()).padStart(2,'0');
+    const hour = String(now.getHours()).padStart(2,'0');
+    const min = String(now.getMinutes()).padStart(2,'0');
+    return { day, time:`${hour}:${min}` };
+}
+
+map.on(L.Draw.Event.CREATED, e=>{
+    const layer = e.layer;
+
+    const { day, time } = getDateInfo();
+
+    layer.setStyle({ color:currentColor, fillColor:currentColor, fillOpacity:0.4 });
+    layer.bindPopup(`${currentAlert}<br>Jour : ${day}<br>Heure : ${time}`);
+
+    layer._alert = currentAlert;
+    layer._color = currentColor;
+    layer._day = day;
+    layer._time = time;
+
+    drawnItems.addLayer(layer);
+    saveZones();
+});
+
+map.on(L.Draw.Event.EDITED, saveZones);
+map.on(L.Draw.Event.DELETED, saveZones);
+
+function saveZones(){
+    const data = [];
+
+    drawnItems.eachLayer(layer=>{
+        if(layer instanceof L.Polygon || layer instanceof L.Rectangle){
+            data.push({
+                type:"polygon",
+                coords:layer.getLatLngs(),
+                color:layer._color,
+                alert:layer._alert,
+                day:layer._day,
+                time:layer._time
+            });
+        }
+    });
+
+    localStorage.setItem("alertes_zones", JSON.stringify(data));
+}
+
+function loadZones(){
+    const saved = localStorage.getItem("alertes_zones");
+    if(!saved) return;
+
+    JSON.parse(saved).forEach(item=>{
+        const layer = L.polygon(item.coords,{
+            color:item.color,
+            fillColor:item.color,
+            fillOpacity:0.4
+        });
+
+        layer.bindPopup(`${item.alert}<br>Jour : ${item.day}<br>Heure : ${item.time}`);
+
+        layer._alert = item.alert;
+        layer._color = item.color;
+        layer._day = item.day;
+        layer._time = item.time;
+
+        drawnItems.addLayer(layer);
+    });
+}
+
+loadZones();
+
+</script>
+
+</body>
+</html>
