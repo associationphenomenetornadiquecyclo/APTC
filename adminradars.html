@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>APTC - Radar Europe (RainViewer)</title>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
+    <style>
+        body {
+            margin: 0;
+            background: #0a1a2a;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+
+        .navbar {
+            display: flex;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.85);
+            padding: 10px 20px;
+            border-bottom: 2px solid #1e90ff;
+            position: fixed;
+            top: 0;
+            width: 100%;
+            z-index: 1000;
+        }
+
+        .navbar img {
+            height: 45px;
+            margin-right: 10px;
+        }
+
+        .navbar .title {
+            font-size: 22px;
+            font-weight: bold;
+            margin-right: 40px;
+            color: #ffffff;
+        }
+
+        .navbar a {
+            margin-right: 20px;
+            text-decoration: none;
+            color: #cfe8ff;
+            font-size: 18px;
+            transition: 0.3s;
+        }
+
+        .navbar a:hover {
+            color: #1e90ff;
+        }
+
+        /* --- LAYOUT RADAR + ALERTES --- */
+        .radar-layout {
+            display: flex;
+            width: 90%;
+            margin: 120px auto 20px auto;
+            gap: 20px;
+        }
+
+        .radar-frame {
+            flex: 3;
+            background: rgba(0,0,0,0.55);
+            border: 2px solid #1e90ff;
+            border-radius: 15px;
+            padding: 15px;
+            box-shadow: 0 0 15px rgba(30,144,255,0.4);
+        }
+
+        .radar-header {
+            font-size: 22px;
+            font-weight: bold;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #1e90ff;
+            margin-bottom: 10px;
+
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* --- MENU A2 DARK --- */
+        .layer-selector {
+            position: relative;
+            display: inline-block;
+        }
+
+        .layer-btn {
+            background: rgba(0,0,0,0.6);
+            border: 1px solid #1e90ff;
+            padding: 8px 14px;
+            border-radius: 8px;
+            color: white;
+            cursor: pointer;
+            font-size: 15px;
+            transition: 0.2s;
+        }
+
+        .layer-btn:hover {
+            background: rgba(30,144,255,0.4);
+        }
+
+        .layer-menu {
+            display: none;
+            position: absolute;
+            right: 0;
+            margin-top: 5px;
+            background: rgba(0,0,0,0.75);
+            border: 1px solid #1e90ff;
+            border-radius: 10px;
+            box-shadow: 0 0 12px rgba(30,144,255,0.5);
+            overflow: hidden;
+            z-index: 999;
+        }
+
+        .layer-menu div {
+            padding: 10px 15px;
+            cursor: pointer;
+            transition: 0.2s;
+            white-space: nowrap;
+        }
+
+        .layer-menu div:hover {
+            background: rgba(30,144,255,0.4);
+        }
+
+        #map {
+            width: 100%;
+            height: 500px;
+            border-radius: 10px;
+        }
+
+        .radar-controls {
+            display: flex;
+            align-items: center;
+            margin-top: 10px;
+            gap: 10px;
+        }
+
+        .icon-btn {
+            background: #0f2a45;
+            border: 1px solid #1e90ff;
+            border-radius: 6px;
+            padding: 6px 10px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .icon-btn:hover {
+            background: #1e90ff;
+        }
+
+        .icon-btn svg {
+            width: 20px;
+            height: 20px;
+            fill: white;
+        }
+
+        .frame-time {
+            margin-left: 10px;
+            font-weight: bold;
+            font-size: 15px;
+        }
+
+        #frameSlider {
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .radar-legend {
+            margin-top: 12px;
+            padding-top: 10px;
+            border-top: 1px solid #1e90ff;
+            font-size: 14px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .radar-legend span {
+            display: inline-block;
+            width: 18px;
+            height: 12px;
+            border-radius: 3px;
+        }
+
+        .leg-blue { background: #4da6ff; }
+        .leg-green { background: #00cc44; }
+        .leg-yellow { background: #ffeb3b; }
+        .leg-orange { background: #ff9800; }
+        .leg-red { background: #ff0000; }
+        .leg-purple { background: #8e24aa; }
+
+        /* --- ALERTES APTC (STYLE TUBA) --- */
+        .alert-box {
+            flex: 1;
+            background: rgba(0,0,0,0.55);
+            border: 2px solid #1e90ff;
+            border-radius: 15px;
+            padding: 15px;
+            box-shadow: 0 0 15px rgba(30,144,255,0.4);
+            height: 500px;
+            overflow-y: auto;
+        }
+
+        .alert-title {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #1e90ff;
+            padding-bottom: 5px;
+        }
+
+        .alert-item {
+            display: flex;
+            gap: 12px;
+            padding: 12px;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            border-left: 4px solid transparent;
+            background: rgba(0,0,0,0.45);
+        }
+
+        .alert-icon svg {
+            width: 40px;
+            height: 40px;
+        }
+
+        .alert-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .alert-title-text {
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .alert-location {
+            font-size: 15px;
+            opacity: 0.85;
+        }
+
+        .alert-time {
+            font-size: 14px;
+            opacity: 0.75;
+        }
+
+        .alert-tornado { border-left-color:#ff0000; }
+        .alert-orage { border-left-color:#ff9800; }
+        .alert-pluie { border-left-color:#4da6ff; }
+        .alert-vent { border-left-color:#00e5ff; }
+        .alert-grele { border-left-color:#8e24aa; }
+        .alert-neige { border-left-color:#ffffff; }
+        .alert-inondation { border-left-color:#00b7ff; }
+
+    </style>
+</head>
+<body>
+
+    <div class="navbar">
+        <img src="logo.png" alt="Logo APTC">
+        <div class="title">A.P.T.C — Admin</div>
+
+        <a href="adminindex.html">Accueil</a>
+        <a href="adminactualites.html">Actualités</a>
+        <a href="adminalertes.html">Alertes</a>
+        <a href="adminradars.html">Radars</a>
+        <a href="adminrecherches.html">Recherches</a>
+        <a href="adminrisques.html">Risques</a>
+        <a href="adminsaison-tornades.html">Saison Tornades</a>
+        <a href="adminsaison-cyclones-tropicaux.html">Saison Cyclones Tropicaux</a>
+    </div>
+
+    <!-- LAYOUT RADAR + ALERTES -->
+    <div class="radar-layout">
+
+        <!-- RADAR -->
+        <div class="radar-frame">
+
+            <div class="radar-header">
+                🛰️ Radar Europe — RainViewer
+
+                <div class="layer-selector">
+                    <div class="layer-btn" onclick="toggleMenu()">Réflectivité ▼</div>
+
+                    <div class="layer-menu" id="layerMenu">
+                        <div onclick="changeLayer('rain')">Réflectivité</div>
+                        <div onclick="changeLayer('ir')">Satellite IR</div>
+                        <div onclick="changeLayer('vis')">Satellite Visible</div>
+                        <div onclick="changeLayer('wv')">WV</div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="map"></div>
+
+            <div class="radar-controls">
+
+                <button class="icon-btn" onclick="startAnimation()">
+                    <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                </button>
+
+                <button class="icon-btn" onclick="stopAnimation()">
+                    <svg viewBox="0 0 24 24"><path d="M6 19h4V5H6zm8-14v14h4V5z"/></svg>
+                </button>
+
+                <button class="icon-btn" onclick="resetRadar()">
+                    <svg viewBox="0 0 24 24"><path d="M12 5V1L7 6l5 5V7c3.3 0 6 2.7 6 6s-2.7 6-6 6-6-2.7-6-6H4c0 4.4 3.6 8 8 8s8-3.6 8-8-3.6-8-8-8z"/></svg>
+                </button>
+
+                <span id="frameTime" class="frame-time">--:--</span>
+            </div>
+
+            <input type="range" id="frameSlider" min="0" max="11" value="0" onchange="setFrame(this.value)">
+
+            <div class="radar-legend">
+                <span class="leg-blue"></span> Faible
+                <span class="leg-green"></span> Modérée
+                <span class="leg-yellow"></span> Forte
+                <span class="leg-orange"></span> Très forte
+                <span class="leg-red"></span> Violente
+                <span class="leg-purple"></span> Extrême
+            </div>
+
+        </div> <!-- radar-frame -->
+
+        <!-- ALERTES -->
+        <div class="alert-box">
+            <div class="alert-title">⚠️ Liste des alertes</div>
+            <div id="alertList"></div>
+        </div>
+
+    </div> <!-- radar-layout -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+    const map = L.map('map', {
+        minZoom: 3,
+        maxZoom: 8
+    }).setView([50, 10], 4);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 8,
+        minZoom: 3
+    }).addTo(map);
+
+    /* --- VARIABLES --- */
+    let radarFrames = [];
+    let frameIndex = 0;
+    let radarAnim = null;
+    let radarLayer = null;
+    let currentLayer = "rain";
+
+    /* --- MENU --- */
+    function toggleMenu() {
+        const menu = document.getElementById("layerMenu");
+        menu.style.display = (menu.style.display === "block") ? "none" : "block";
+    }
+
+    window.onclick = function(e) {
+        if (!e.target.matches('.layer-btn')) {
+            document.getElementById("layerMenu").style.display = "none";
+        }
+    }
+
+    /* --- CHANGEMENT DE COUCHE --- */
+    function changeLayer(type) {
+        currentLayer = type;
+        document.querySelector(".layer-btn").textContent = 
+            (type === "rain" ? "Réflectivité ▼" :
+             type === "ir"   ? "Satellite IR ▼" :
+             type === "vis"  ? "Satellite Visible ▼" :
+             "WV ▼");
+
+        loadRainViewer();
+    }
+
+    /* --- CHARGEMENT DES FRAMES --- */
+    async function loadRainViewer() {
+        const res = await fetch("https://api.rainviewer.com/public/weather-maps.json");
+        const data = await res.json();
+
+        let source = null;
+
+        if (currentLayer === "rain") source = data.radar.past;
+        if (currentLayer === "ir")   source = data.satellite.infrared;
+        if (currentLayer === "vis")  source = data.satellite.visible;
+        if (currentLayer === "wv")   source = data.satellite.water_vapor;
+
+        radarFrames = source;
+        frameIndex = radarFrames.length - 1;
+
+        document.getElementById("frameSlider").max = radarFrames.length - 1;
+        document.getElementById("frameSlider").value = frameIndex;
+
+        updateRadarFrame();
+        updateFrameTime();
+    }
+
+    /* --- MISE À JOUR DE LA FRAME --- */
+    function updateRadarFrame() {
+        const frame = radarFrames[frameIndex];
+        if (!frame) return;
+
+        const url = `https://tilecache.rainviewer.com${frame.path}/256/{z}/{x}/{y}/2/1_1.png`;
+
+        if (radarLayer) {
+            map.removeLayer(radarLayer);
+        }
+
+        radarLayer = L.tileLayer(url, { 
+            opacity: 0.8, 
+            zIndex: 500,
+            updateWhenIdle: false,
+            updateWhenZooming: false,
+            keepBuffer: 4
+        }).addTo(map);
+    }
+
+    /* --- ANIMATION --- */
+    function startAnimation() {
+        if (radarAnim) return;
+
+        radarAnim = setInterval(() => {
+            frameIndex = (frameIndex + 1) % radarFrames.length;
+            document.getElementById("frameSlider").value = frameIndex;
+
+            updateRadarFrame();
+            updateFrameTime();
+        }, 500);
+    }
+
+    function stopAnimation() {
+        clearInterval(radarAnim);
+        radarAnim = null;
+    }
+
+    function resetRadar() {
+        stopAnimation();
+        frameIndex = radarFrames.length - 1;
+        document.getElementById("frameSlider").value = frameIndex;
+        updateRadarFrame();
+        updateFrameTime();
+    }
+
+    function setFrame(f) {
+        frameIndex = parseInt(f);
+        updateRadarFrame();
+        updateFrameTime();
+    }
+
+    /* --- HEURE --- */
+    function updateFrameTime() {
+        const frame = radarFrames[frameIndex];
+        if (!frame) return;
+
+        const date = new Date(frame.time * 1000);
+        const hh = date.getHours().toString().padStart(2, "0");
+        const mm = date.getMinutes().toString().padStart(2, "0");
+
+        document.getElementById("frameTime").textContent = `${hh}:${mm}`;
+    }
+
+    /* --- ALERTES APTC (STYLE TUBA) --- */
+    function addAlert(alert) {
+
+        const icons = {
+            "tornado": `<svg viewBox="0 0 64 64"><path fill="#ff0000" d="M10 10h44l-5 8H15zM18 22h28l-4 7H22zM25 33h14l-3 6H28zM30 43h4l-2 5z"/></svg>`,
+            "orage": `<svg viewBox="0 0 64 64"><polygon fill="#ff9800" points="28,4 12,34 26,34 20,60 52,26 36,26 44,4"/></svg>`,
+            "pluie": `<svg viewBox="0 0 64 64"><path fill="#4da6ff" d="M20 24c0-8 6-14 14-14s14 6 14 14h6c6 0 10 4 10 10s-4 10-10 10H14c-6 0-10-4-10-10s4-10 10-10h6z"/></svg>`,
+            "vent": `<svg viewBox="0 0 64 64"><path fill="#00e5ff" d="M10 22h40c6 0 10-4 10-10s-4-10-10-10c-4 0-7 2-9 5l5 3c1-2 2-3 4-3 3 0 5 2 5 5s-2 5-5 5H10z"/></svg>`,
+            "grele": `<svg viewBox="0 0 64 64"><circle cx="22" cy="52" r="4" fill="#8e24aa"/><circle cx="32" cy="52" r="4" fill="#8e24aa"/><circle cx="42" cy="52" r="4" fill="#8e24aa"/></svg>`,
+            "neige": `<svg viewBox="0 0 64 64"><path fill="#ffffff" d="M32 4l4 12h12l-10 8 4 12-10-8-10 8 4-12-10-8h12z"/></svg>`,
+            "inondation": `<svg viewBox="0 0 64 64"><path fill="#00b7ff" d="M0 40c10 0 10-8 20-8s10 8 20 8 10-8 20-8 10 8 20 8v10H0z"/></svg>`
+        };
+
+        const classes = {
+            "tornado": "alert-tornado",
+            "orage": "alert-orage",
+            "pluie": "alert-pluie",
+            "vent": "alert-vent",
+            "grele": "alert-grele",
+            "neige": "alert-neige",
+            "inondation": "alert-inondation"
+        };
+
+        const div = document.createElement("div");
+        div.className = `alert-item ${classes[alert.type]}`;
+
+        const villes = alert.villes.join(", ");
+        const departements = alert.departements.join(", ");
+
+        div.innerHTML = `
+            <div class="alert-icon">${icons[alert.type]}</div>
+            <div class="alert-info">
+                <div class="alert-title-text">${alert.type.toUpperCase()}</div>
+                <div class="alert-location">${villes} (${departements})</div>
+                <div class="alert-time">${alert.date} — ${alert.heure}</div>
+            </div>
+        `;
+
+        document.getElementById("alertList").prepend(div);
+    }
+
+    /* --- CHARGEMENT DES ALERTES --- */
+    function loadAlerts() {
+        const alerts = JSON.parse(localStorage.getItem("apct_alerts")) || [];
+
+        document.getElementById("alertList").innerHTML = "";
+
+        alerts.reverse().forEach(alert => {
+            addAlert(alert);
+        });
+    }
+
+    loadAlerts();
+
+    /* --- MISE À JOUR AUTOMATIQUE --- */
+    window.addEventListener("storage", loadAlerts);
+
+    /* --- AUTO UPDATE RADAR --- */
+    setInterval(loadRainViewer, 300000);
+    loadRainViewer();
+</script>

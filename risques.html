@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>APTC - Risques (Spectateur)</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
+<style>
+/* ======== FOND ATMOSPHÉRIQUE ULTRA-PREMIUM ======== */
+body {
+    margin: 0;
+    background: radial-gradient(circle at 20% 10%, #07101f, #020712 70%, #000000 100%);
+    color: white;
+    font-family: Arial, sans-serif;
+    overflow: hidden;
+}
+
+/* Halo météo */
+body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background:
+        radial-gradient(circle at 15% 10%, rgba(30,144,255,0.55), transparent 60%),
+        radial-gradient(circle at 85% 90%, rgba(0,206,209,0.45), transparent 60%);
+    opacity: 0.55;
+    pointer-events: none;
+    mix-blend-mode: screen;
+    animation: haloMove 14s infinite alternate ease-in-out;
+}
+
+@keyframes haloMove {
+    0% { transform: translateY(0px); }
+    100% { transform: translateY(25px); }
+}
+
+/* Grain */
+body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background: url('https://grainy-gradients.vercel.app/noise.svg');
+    opacity: 0.12;
+    pointer-events: none;
+}
+
+/* ======== NAVBAR CINÉMATIQUE ======== */
+.navbar {
+    display: flex;
+    align-items: center;
+    background: rgba(0,0,0,0.75);
+    padding: 12px 24px;
+    border-bottom: 2px solid #1e90ff;
+    position: fixed;
+    top: 0;
+    width: 100%;
+    z-index: 1000;
+    backdrop-filter: blur(18px) saturate(180%);
+    box-shadow: 0 0 40px rgba(0,0,0,0.8);
+}
+
+.navbar img {
+    height: 48px;
+    margin-right: 12px;
+    filter: drop-shadow(0 0 12px rgba(30,144,255,1));
+}
+
+.navbar .title {
+    font-size: 24px;
+    font-weight: bold;
+    margin-right: 40px;
+    color: #ffffff;
+    letter-spacing: 1px;
+    text-shadow: 0 0 16px rgba(30,144,255,1);
+}
+
+.navbar a {
+    margin-right: 22px;
+    text-decoration: none;
+    color: #cfe8ff;
+    font-size: 18px;
+    transition: 0.3s;
+}
+
+.navbar a:hover {
+    color: #1e90ff;
+    text-shadow: 0 0 12px rgba(30,144,255,1);
+}
+
+/* ======== LAYOUT ======== */
+.content {
+    display: flex;
+    margin-top: 80px;
+    height: calc(100vh - 80px);
+}
+
+/* ======== SIDEBAR PREMIUM ======== */
+.sidebar {
+    width: 300px;
+    background: rgba(0,0,0,0.55);
+    padding: 20px;
+    border-right: 1px solid rgba(255,255,255,0.15);
+    overflow-y: auto;
+    backdrop-filter: blur(14px);
+}
+
+.sidebar h2 {
+    margin-top: 0;
+    font-size: 24px;
+    text-shadow: 0 0 12px rgba(30,144,255,0.8);
+}
+
+.sidebar p {
+    font-size: 15px;
+    opacity: 0.9;
+    margin-bottom: 20px;
+}
+
+/* Boutons J1 / J2 / J3 */
+.day-selector {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.day-btn {
+    flex: 1;
+    padding: 10px;
+    background: #1e90ff;
+    border: none;
+    border-radius: 10px;
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+    transition: 0.25s;
+    box-shadow: 0 0 12px rgba(30,144,255,0.6);
+}
+
+.day-btn:hover {
+    background: #63b3ff;
+    transform: translateY(-2px);
+}
+
+.day-btn.active {
+    background: #63b3ff;
+    outline: 2px solid white;
+}
+
+/* ======== CARTE ======== */
+#map {
+    flex: 1;
+    filter: drop-shadow(0 0 12px rgba(0,0,0,0.6));
+}
+
+/* ======== LÉGENDE PREMIUM ======== */
+.legende-risques {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: rgba(0,0,0,0.55);
+    padding: 18px 22px;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,0.18);
+    font-size: 15px;
+    backdrop-filter: blur(12px);
+    box-shadow: 0 0 22px rgba(0,0,0,0.6);
+}
+
+.legende-risques h3 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    text-shadow: 0 0 12px rgba(30,144,255,0.8);
+}
+
+.legende-risques .ligne {
+    display: flex;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.legende-risques .couleur {
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    margin-right: 8px;
+}
+
+/* ======== LABELS SUR LES ZONES ======== */
+.risk-label {
+    font-weight: bold;
+    font-size: 20px;
+    text-shadow:
+        -2px -2px 0 white,
+         2px -2px 0 white,
+        -2px  2px 0 white,
+         2px  2px 0 white;
+}
+</style>
+</head>
+
+<body>
+
+<!-- NAVBAR -->
+<div class="navbar">
+    <img src="logo.png" alt="Logo APTC">
+    <div class="title">A.P.T.C</div>
+
+    <a href="index.html">Accueil</a>
+    <a href="actualites.html">Actualités</a>
+    <a href="alertes.html">Alertes</a>
+    <a href="radars.html">Radars</a>
+    <a href="recherches.html">Recherches</a>
+    <a href="risques.html">Risques</a>
+    <a href="saison-tornades.html">Saison Tornades</a>
+    <a href="saison-cyclones-tropicaux.html">Saison Cyclones Tropicaux</a>
+</div>
+
+<div class="content">
+
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+        <h2>Niveaux de risque</h2>
+        <p>Visualisation des zones de risque établies par l’APTC.</p>
+
+        <div class="day-selector">
+            <button class="day-btn active" data-day="J1">J1</button>
+            <button class="day-btn" data-day="J2">J2</button>
+            <button class="day-btn" data-day="J3">J3</button>
+        </div>
+    </div>
+
+    <!-- CARTE -->
+    <div id="map"></div>
+</div>
+
+<!-- LÉGENDE -->
+<div class="legende-risques">
+    <h3>Légende des risques</h3>
+
+    <div class="ligne"><span class="couleur" style="background:#00FF00;"></span> TSTM — Orages faibles</div>
+    <div class="ligne"><span class="couleur" style="background:#32CD32;"></span> MRGL — Risque marginal</div>
+    <div class="ligne"><span class="couleur" style="background:#FFD700;"></span> SLGT — Risque léger</div>
+    <div class="ligne"><span class="couleur" style="background:#FFA500;"></span> ENH — Risque renforcé</div>
+    <div class="ligne"><span class="couleur" style="background:#FF0000;"></span> MDT — Risque modéré</div>
+    <div class="ligne"><span class="couleur" style="background:#FF00FF;"></span> HIGH — Risque élevé</div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+// Carte centrée sur la France
+const map = L.map('map').setView([46.8, 2.5], 6);
+
+// Fond de carte
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 12,
+    minZoom: 4,
+    attribution: '&copy; OpenStreetMap'
+}).addTo(map);
+
+// Groupe pour les zones
+const drawnItems = new L.FeatureGroup();
+map.addLayer(drawnItems);
+
+// Jour actif
+let currentDay = "J1";
+
+// Fonction pour créer un label centré
+function createLabel(layer, text, color) {
+    const center = layer.getBounds().getCenter();
+    return L.marker(center, {
+        icon: L.divIcon({
+            className: 'risk-label',
+            html: `<span style="color:${color};">${text}</span>`,
+            iconSize: [50, 20]
+        })
+    }).addTo(map);
+}
+
+// Chargement des zones PAR JOUR
+function loadZonesForDay() {
+
+    drawnItems.eachLayer(layer => {
+        if (layer._label) map.removeLayer(layer._label);
+    });
+
+    drawnItems.clearLayers();
+
+    const saved = localStorage.getItem("risques_zones_" + currentDay);
+    if (!saved) return;
+
+    const data = JSON.parse(saved);
+
+    data.forEach(item => {
+        if (item.type === "polygon") {
+            const layer = L.polygon(item.coords, {
+                color: item.color,
+                fillColor: item.color,
+                fillOpacity: 0.35
+            });
+
+            const label = createLabel(layer, item.risk, item.color);
+
+            layer._label = label;
+            layer._risk = item.risk;
+            layer._color = item.color;
+
+            drawnItems.addLayer(layer);
+        }
+    });
+}
+
+// Boutons J1 / J2 / J3
+const dayButtons = document.querySelectorAll('.day-btn');
+
+dayButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+
+        dayButtons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        currentDay = btn.getAttribute('data-day');
+
+        loadZonesForDay();
+    });
+});
+
+// Charger J1 au démarrage
+loadZonesForDay();
+</script>
+
+</body>
+</html>
